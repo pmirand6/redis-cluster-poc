@@ -1,0 +1,231 @@
+version: "3.8"
+
+services:
+  # — Redis Masters —
+  redis-node-0:
+    image: redis:7.0.0-alpine
+    command: >
+      redis-server --port 6379 --cluster-enabled yes --cluster-config-file nodes.conf
+      --cluster-node-timeout 5000 --appendonly yes --requirepass superpassword2023
+      --masterauth superpassword2023 --cluster-announce-ip redis-node-0
+      --cluster-announce-port 6379 --cluster-announce-bus-port 16379
+      --protected-mode no
+    ports:
+      - "7000:6379"
+      - "17000:16379"
+    volumes:
+      - redis-node-0-data:/data
+    networks:
+      - redis-cluster
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "-h",
+          "redis-node-0",
+          "-a",
+          "superpassword2023",
+          "ping",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis-node-1:
+    image: redis:7.0.0-alpine
+    command: >
+      redis-server --port 6379 --cluster-enabled yes --cluster-config-file nodes.conf
+      --cluster-node-timeout 5000 --appendonly yes --requirepass superpassword2023
+      --masterauth superpassword2023 --cluster-announce-ip redis-node-1
+      --cluster-announce-port 6379 --cluster-announce-bus-port 16379
+      --protected-mode no
+    ports:
+      - "7001:6379"
+      - "17001:16379"
+    volumes:
+      - redis-node-1-data:/data
+    networks:
+      - redis-cluster
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "-h",
+          "redis-node-1",
+          "-a",
+          "superpassword2023",
+          "ping",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis-node-2:
+    image: redis:7.0.0-alpine
+    command: >
+      redis-server --port 6379 --cluster-enabled yes --cluster-config-file nodes.conf
+      --cluster-node-timeout 5000 --appendonly yes --requirepass superpassword2023
+      --masterauth superpassword2023 --cluster-announce-ip redis-node-2
+      --cluster-announce-port 6379 --cluster-announce-bus-port 16379
+      --protected-mode no
+    ports:
+      - "7002:6379"
+      - "17002:16379"
+    volumes:
+      - redis-node-2-data:/data
+    networks:
+      - redis-cluster
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "-h",
+          "redis-node-2",
+          "-a",
+          "superpassword2023",
+          "ping",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # — Redis Replicas —
+  redis-node-3:
+    image: redis:7.0.0-alpine
+    command: >
+      redis-server --port 6379 --cluster-enabled yes --cluster-config-file nodes.conf
+      --cluster-node-timeout 5000 --appendonly yes --requirepass superpassword2023
+      --masterauth superpassword2023 --cluster-announce-ip redis-node-3
+      --cluster-announce-port 6379 --cluster-announce-bus-port 16379
+      --protected-mode no
+    volumes:
+      - redis-node-3-data:/data
+    networks:
+      - redis-cluster
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "-h",
+          "redis-node-3",
+          "-a",
+          "superpassword2023",
+          "ping",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis-node-4:
+    image: redis:7.0.0-alpine
+    command: >
+      redis-server --port 6379 --cluster-enabled yes --cluster-config-file nodes.conf
+      --cluster-node-timeout 5000 --appendonly yes --requirepass superpassword2023
+      --masterauth superpassword2023 --cluster-announce-ip redis-node-4
+      --cluster-announce-port 6379 --cluster-announce-bus-port 16379
+      --protected-mode no
+    volumes:
+      - redis-node-4-data:/data
+    networks:
+      - redis-cluster
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "-h",
+          "redis-node-4",
+          "-a",
+          "superpassword2023",
+          "ping",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis-node-5:
+    image: redis:7.0.0-alpine
+    command: >
+      redis-server --port 6379 --cluster-enabled yes --cluster-config-file nodes.conf
+      --cluster-node-timeout 5000 --appendonly yes --requirepass superpassword2023
+      --masterauth superpassword2023 --cluster-announce-ip redis-node-5
+      --cluster-announce-port 6379 --cluster-announce-bus-port 16379
+      --protected-mode no
+    volumes:
+      - redis-node-5-data:/data
+    networks:
+      - redis-cluster
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "-h",
+          "redis-node-5",
+          "-a",
+          "superpassword2023",
+          "ping",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # — Cluster initializer (runs once) —
+  redis-cluster-init:
+    image: redis:7.0.0-alpine
+    depends_on:
+      - redis-node-0
+      - redis-node-1
+      - redis-node-2
+      - redis-node-3
+      - redis-node-4
+      - redis-node-5
+    # Use array form for sh -c so sleep gets a single "10" argument
+    command:
+      - /bin/sh
+      - -c
+      - |
+        sleep 10 && \
+        echo "Forming Redis Cluster…" && \
+        redis-cli --cluster create \
+          redis-node-0:6379 redis-node-1:6379 redis-node-2:6379 \
+          redis-node-3:6379 redis-node-4:6379 redis-node-5:6379 \
+          --cluster-replicas 1 -a superpassword2023 --cluster-yes
+    restart: "no"
+    networks:
+      - redis-cluster
+
+  # — RedisInsight for monitoring —
+  redisinsight:
+    image: redislabs/redisinsight:latest
+    container_name: redisinsight
+    ports:
+      - "5590:5540"
+    environment:
+      - RI_ACCEPT_TERMS_AND_CONDITIONS=yes
+      - RI_REDIS_HOST=redis-node-0
+      - RI_REDIS_PORT=6379
+      - RI_REDIS_PASSWORD=superpassword2023
+      - RI_REDIS_ALIAS=RedisCluster
+    volumes:
+      - redisinsight-data:/db
+    networks:
+      - redis-cluster
+
+volumes:
+  redis-node-0-data:
+  redis-node-1-data:
+  redis-node-2-data:
+  redis-node-3-data:
+  redis-node-4-data:
+  redis-node-5-data:
+  redisinsight-data:
+
+networks:
+  redis-cluster:
+    external: true
+    name: shared-network
